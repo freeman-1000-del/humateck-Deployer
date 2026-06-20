@@ -121,4 +121,7 @@ async function main(){
     console.error("저장 오류:", saveErr.message);
     process.exit(1);
   }
-  console.log(
+  console.log(`\n=== 완료: 회차 ${snapshotId}에 총 ${saved}건 저장 (전세계 ${globalRows.length} 포함) ===`);
+}
+
+main();
