@@ -1,17 +1,12 @@
 {
-  "name": "scouter-test",
+  "name": "humateck-scouter",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "type": "module",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "fetch": "node fetch.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
-    "dotenv": "^17.4.2"
+    "@supabase/supabase-js": "^2.45.0"
   }
 }
