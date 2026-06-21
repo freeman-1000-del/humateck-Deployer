@@ -66,3 +66,6 @@ async function fetchPopular(code, categoryId){
   let url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics`
     + `&chart=mostPopular&regionCode=${code}&maxResults=50&key=${YT_KEY}`;
   if (categoryId) url += `&videoCategoryId=${categoryId}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(`${code}${categoryId ? '/' + categoryId : ''}: ${data.error.message}`);
