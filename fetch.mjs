@@ -69,3 +69,73 @@ async function fetchPopular(code, categoryId){
   const res = await fetch(url);
   const data = await res.json();
   if (data.error) throw new Error(`${code}${categoryId ? '/' + categoryId : ''}: ${data.error.message}`);
+  return data.items || [];
+}
+
+async function main(){
+  console.log("=== 휴마텍 스카우터 자동 수집 시작 ===");
+
+  const { data: snap, error: snapErr } = await sb
+    .from('scout_snapshots')
+    .insert({ kind: 'popular', note: 'daily auto' })
+    .select()
+    .single();
+  if (snapErr) { console.error("snapshot 생성 실패:", snapErr.message); process.exit(1); }
+  const snapshotId = snap.id;
+  console.log(`수집 회차 ID: ${snapshotId}`);
+
+  let allRows = [];
+  let allForGlobal = [];
+  let diagDone = false;
+
+  for (const c of COUNTRIES){
+    try {
+      const items = await fetchPopular(c.code, null);
+      if (!diagDone && items[0]) {
+        console.log(`[진단] 첫 영상 categoryId = ${items[0].snippet?.categoryId} → 변환 = ${trueCategoryOf(items[0])}`);
+        diagDone = true;
+      }
+      const rows = items.map((v, i) => toRow(v, i, c.code, "all", "youtube"));
+      rows.forEach(r => r.snapshot_id = snapshotId);
+      allRows = allRows.concat(rows);
+      allForGlobal = allForGlobal.concat(rows);
+      console.log(`OK [전체] ${c.code}: ${rows.length}`);
+    } catch(e){ console.log(`FAIL [전체] ${e.message}`); }
+  }
+
+  for (const cat of CATEGORIES){
+    for (const c of COUNTRIES){
+      try {
+        const items = await fetchPopular(c.code, cat.id);
+        const rows = items.map((v, i) => toRow(v, i, c.code, cat.key, "youtube"));
+        rows.forEach(r => r.snapshot_id = snapshotId);
+        allRows = allRows.concat(rows);
+        console.log(`OK [${cat.key}] ${c.code}: ${rows.length}`);
+      } catch(e){ /* 일부 미지원 조합은 건너뜀 */ }
+    }
+  }
+
+  const seen = new Set();
+  const globalRows = [...allForGlobal]
+    .sort((a,b)=> b.view_count - a.view_count)
+    .filter(v => { if(seen.has(v.video_id)) return false; seen.add(v.video_id); return true; })
+    .slice(0,100)
+    .map((v,i)=> ({...v, country_code:"GLOBAL", continent:null, category_key:"all", rank:i+1, snapshot_id:snapshotId}));
+  allRows = allRows.concat(globalRows);
+
+  let saved = 0, saveErr = null;
+  for (let i = 0; i < allRows.length; i += 500){
+    const chunk = allRows.slice(i, i + 500);
+    const { error } = await sb.from('scout_videos').insert(chunk);
+    if (error){ saveErr = error; break; }
+    saved += chunk.length;
+  }
+
+  if (saveErr){
+    console.error("저장 오류:", saveErr.message);
+    process.exit(1);
+  }
+  console.log(`\n=== 완료: 회차 ${snapshotId}에 총 ${saved}건 저장 (전세계 ${globalRows.length} 포함) ===`);
+}
+
+main();
